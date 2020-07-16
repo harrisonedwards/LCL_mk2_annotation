@@ -1,0 +1,12 @@
+
+.idea/
+
+__pycache__/
+
+test_files/
+
+venv/
+
+.p
+
+*.p
