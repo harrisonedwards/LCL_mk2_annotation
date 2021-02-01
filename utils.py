@@ -83,6 +83,12 @@ def draw_all_channels(d):
         img = draw_objects(img, obj_channels[k], colors)
     return img
 
+def validateDirectoryFormat(dir):
+    for f in os.listdir(dir):
+        if '.yml' in f:
+            return True
+    return False
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Annotator for the LCL mk 2 system.')
     parser.add_argument('directory', help='Directory where the files to be annotated are stored.')

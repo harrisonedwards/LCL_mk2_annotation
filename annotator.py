@@ -4,8 +4,8 @@ import sys
 import numpy as np
 from PIL import Image
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QFileDialog
-from utils import get_unique_names, get_all_paths_and_channels, get_obj_channels
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from utils import get_unique_names, get_all_paths_and_channels, get_obj_channels, validateDirectoryFormat
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -173,7 +173,7 @@ class Window(QtWidgets.QWidget):
         self.VBlayout.addLayout(self.HBlayout)
         self.channels = {}
         self.rect_start = []
-        self.annotation_color = QtGui.QColor(0, 0, 0)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(0, 0, 0), 3, QtCore.Qt.SolidLine)
         self.deletingAnnotations = False
         self.annotationType = 'None'
         self.annotations = []
@@ -182,8 +182,14 @@ class Window(QtWidgets.QWidget):
     def loadImage(self):
         # TODO fix loading new image crashing
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
-        print(ret)
-        if len(ret) < 4: return
+        if len(ret) < 4:
+            return
+        else:
+            if validateDirectoryFormat(ret):
+                self.directory = ret
+            else:
+                QMessageBox.about(self, "Error", "Invalid LCL Record Directory")
+                return False
         unique_names, fl = get_unique_names(self.directory)
         selection, ok = QtWidgets.QInputDialog.getItem(
             self, 'Select', 'Image set to annotate:', unique_names)
@@ -212,7 +218,7 @@ class Window(QtWidgets.QWidget):
                 max_x = max(pos.x(), self.rect_start[0])
                 max_y = max(pos.y(), self.rect_start[1])
                 self.viewer.scene.addRect(QtCore.QRectF(min_x, min_y, max_x - min_x, max_y - min_y),
-                                          self.annotation_color)
+                                          self.annotation_pen)
                 self.annotations.append((self.annotationType, min_x, min_y, max_x, max_y))
             if self.deletingAnnotations:
                 self.deleteAnnotation(pos)
@@ -226,39 +232,39 @@ class Window(QtWidgets.QWidget):
     def annotateNone(self):
         self.viewer.toggleDragMode(True)
         self.deletingAnnotations = False
-        self.annotation_color = QtGui.QColor(0, 0, 0)
+        self.annotation_pen = QtGui.QColor(0, 0, 0)
         self.annotationType = 'None'
         print('annotating None')
 
     def annotatePositive(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = False
-        self.annotation_color = QtGui.QColor(0, 255, 0)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(165, 94, 234), 10, QtCore.Qt.SolidLine)
         self.annotationType = 'Positive'
         print('annotating positive')
 
     def annotateNegative(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = False
-        self.annotation_color = QtGui.QColor(255, 0, 0)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(254, 211, 48), 10, QtCore.Qt.SolidLine)
         self.annotationType = 'Negative'
         print('annotating negative')
 
     def startDeleteMode(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = True
-        self.annotation_color = QtGui.QColor(0, 0, 0)
+        self.annotation_pen = QtGui.QColor(0, 0, 0)
         self.annotationType = 'None'
         print('deleting annotation')
 
     def deleteAnnotation(self, pos):
         rect = self.viewer.scene.itemAt(pos, QtGui.QTransform())
         if type(rect) != QtWidgets.QGraphicsPixmapItem:
-            self.viewer.scene.removeItem(rect)
             for annotation in self.annotations:
                 if annotation[1] < pos.x() < annotation[3] and annotation[2] < pos.y() < annotation[4]:
                     self.annotations.remove(annotation)
                     print('deleting:', annotation)
+                    self.viewer.scene.removeItem(rect)
 
     def saveAnnotations(self):
         fileName, _ = QFileDialog.getSaveFileName(self, "Enter location to save annotations", "", "Pickle files (*.p)")
@@ -298,7 +304,6 @@ class Window(QtWidgets.QWidget):
     def autoAnnotate(self):
         for k, v in self.channelGroupBoxes.items():
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
-
 
     def autoLocate(self):
         obj_channels = get_obj_channels(self.directory)
