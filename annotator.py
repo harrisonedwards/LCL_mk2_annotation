@@ -5,9 +5,10 @@ import numpy as np
 from PIL import Image
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog
-from utils import get_unique_names, get_all_paths_and_channels
+from utils import get_unique_names, get_all_paths_and_channels, get_obj_channels
 
 Image.MAX_IMAGE_PIXELS = None
+
 
 class PhotoViewer(QtWidgets.QGraphicsView):
     photoClicked = QtCore.pyqtSignal(QtCore.QPoint)
@@ -107,6 +108,7 @@ class PhotoViewer(QtWidgets.QGraphicsView):
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super(Window, self).__init__()
+        self.directory = None
 
         self.viewer = PhotoViewer(self)
         self.viewer.photoClicked.connect(self.photoClicked)
@@ -147,6 +149,12 @@ class Window(QtWidgets.QWidget):
         self.saveAnnotationPushButton = QtWidgets.QPushButton(text='Save Annotations')
         self.saveAnnotationPushButton.clicked.connect(self.saveAnnotations)
 
+        self.autoLocatePushButton = QtWidgets.QPushButton(text='Auto Find')
+        self.autoLocatePushButton.clicked.connect(self.autoLocate)
+
+        self.autoAnnotatePushbutton = QtWidgets.QPushButton(text='Auto Annotate')
+        self.autoAnnotatePushbutton.clicked.connect(self.autoAnnotate)
+
         # Arrange layout
         self.VBlayout = QtWidgets.QVBoxLayout(self)
         self.VBlayout.addWidget(self.viewer)
@@ -161,6 +169,7 @@ class Window(QtWidgets.QWidget):
         self.HBlayout.addWidget(self.annotationGroupBox)
         # self.HBlayout.addWidget(self.loadAnnotationPushButton)
         self.HBlayout.addWidget(self.saveAnnotationPushButton)
+        self.HBlayout.addWidget(self.autoLocatePushButton)
         self.VBlayout.addLayout(self.HBlayout)
         self.channels = {}
         self.rect_start = []
@@ -168,13 +177,17 @@ class Window(QtWidgets.QWidget):
         self.deletingAnnotations = False
         self.annotationType = 'None'
         self.annotations = []
+        self.channelGroupBoxes = {}
 
     def loadImage(self):
-        directory = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
-        unique_names, fl = get_unique_names(directory)
+        # TODO fix loading new image crashing
+        ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
+        print(ret)
+        if len(ret) < 4: return
+        unique_names, fl = get_unique_names(self.directory)
         selection, ok = QtWidgets.QInputDialog.getItem(
             self, 'Select', 'Image set to annotate:', unique_names)
-        self.channels = get_all_paths_and_channels(directory, selection, fl)
+        self.channels = get_all_paths_and_channels(self.directory, selection, fl)
         for channel in self.channels.keys():
             self.channelComboBoxWidget.addItem(channel)
         if 'Default' in self.channels.keys():
@@ -267,6 +280,39 @@ class Window(QtWidgets.QWidget):
             save_list.append(temp_tuple)
         pickle.dump(save_list, open(fileName, 'wb'))
         print('done')
+
+    def addChannelSelections(self, obj_channels):
+        colors = [' (RED)', ' (GREEN)', ' (BLUE)']
+        for i, (k, v) in enumerate(obj_channels.items()):
+            tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
+            tempGroupBoxLayout = QtWidgets.QHBoxLayout()
+            tempGroupBox.setLayout(tempGroupBoxLayout)
+            tempPositiveRadioButton = QtWidgets.QRadioButton('+ Marker')
+            tempNegativeRadioButton = QtWidgets.QRadioButton('- Marker')
+            tempGroupBoxLayout.addWidget(tempPositiveRadioButton)
+            tempGroupBoxLayout.addWidget(tempNegativeRadioButton)
+            self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
+            self.HBlayout.addWidget(tempGroupBox)
+        self.HBlayout.addWidget(self.autoAnnotatePushbutton)
+
+    def autoAnnotate(self):
+        for k, v in self.channelGroupBoxes.items():
+            print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
+
+
+    def autoLocate(self):
+        obj_channels = get_obj_channels(self.directory)
+        colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
+
+        for i, [k, v] in enumerate(obj_channels.items()):
+            color = colors[i]
+            objs = obj_channels[k]
+            for obj in objs:
+                s = (obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)
+                if 1E6 > s > 100:
+                    self.viewer.scene.addRect(QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
+                                                            , obj[0].stop - obj[0].start), color)
+        self.addChannelSelections(obj_channels)
 
     def loadAnnotations(self):
         print('loading annotations...')
