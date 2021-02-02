@@ -50,7 +50,7 @@ class PhotoViewer(QtWidgets.QGraphicsView):
                 self.scale(factor, factor)
             # self._zoom = 0
 
-        self.scene.addLine(QtCore.QLineF(200, 200, 200, 500))
+
         self.scene.update()
 
     def setPhoto(self, pixmap=None, channel_change=False):
@@ -119,6 +119,9 @@ class Window(QtWidgets.QWidget):
         self.btnLoad.setText('Open Image Directory')
         self.btnLoad.clicked.connect(self.loadImage)
 
+        self.removeRectPushbutton = QtWidgets.QPushButton(text='Remove Rectangles')
+        self.removeRectPushbutton.clicked.connect(self.removeAllRects)
+
         self.channelLabel = QtWidgets.QLabel(text='Channel:')
         self.channelComboBoxWidget = QtWidgets.QComboBox()
         self.channelComboBoxWidget.setFixedWidth(150)
@@ -163,6 +166,7 @@ class Window(QtWidgets.QWidget):
         self.HBlayout.setAlignment(QtCore.Qt.AlignLeft)
 
         self.HBlayout.addWidget(self.btnLoad)
+        self.HBlayout.addWidget(self.removeRectPushbutton)
         self.HBlayout.addWidget(self.channelLabel)
         self.HBlayout.addWidget(self.channelComboBoxWidget)
 
@@ -178,9 +182,10 @@ class Window(QtWidgets.QWidget):
         self.annotationType = 'None'
         self.annotations = []
         self.channelGroupBoxes = {}
+        self.channelSliders = {}
+        self.obj_channels = None
 
     def loadImage(self):
-        # TODO fix loading new image crashing
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
         if len(ret) < 4:
             return
@@ -239,14 +244,14 @@ class Window(QtWidgets.QWidget):
     def annotatePositive(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = False
-        self.annotation_pen = QtGui.QPen(QtGui.QColor(165, 94, 234), 10, QtCore.Qt.SolidLine)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(254, 211, 48), 8, QtCore.Qt.SolidLine)
         self.annotationType = 'Positive'
         print('annotating positive')
 
     def annotateNegative(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = False
-        self.annotation_pen = QtGui.QPen(QtGui.QColor(254, 211, 48), 10, QtCore.Qt.SolidLine)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(165, 94, 234), 8, QtCore.Qt.SolidLine)
         self.annotationType = 'Negative'
         print('annotating negative')
 
@@ -257,14 +262,21 @@ class Window(QtWidgets.QWidget):
         self.annotationType = 'None'
         print('deleting annotation')
 
+    def removeAllRects(self):
+        # TODO make this work...
+        for item in self.viewer.scene.items():
+            print(item)
+            if item.type() == QtWidgets.QGraphicsRectItem:
+                self.viewer.scene.removeItem(item)
+
     def deleteAnnotation(self, pos):
         rect = self.viewer.scene.itemAt(pos, QtGui.QTransform())
         if type(rect) != QtWidgets.QGraphicsPixmapItem:
             for annotation in self.annotations:
                 if annotation[1] < pos.x() < annotation[3] and annotation[2] < pos.y() < annotation[4]:
+                    self.viewer.scene.removeItem(rect)
                     self.annotations.remove(annotation)
                     print('deleting:', annotation)
-                    self.viewer.scene.removeItem(rect)
 
     def saveAnnotations(self):
         fileName, _ = QFileDialog.getSaveFileName(self, "Enter location to save annotations", "", "Pickle files (*.p)")
@@ -287,18 +299,35 @@ class Window(QtWidgets.QWidget):
         pickle.dump(save_list, open(fileName, 'wb'))
         print('done')
 
-    def addChannelSelections(self, obj_channels):
+    def getSliderValues(self, _):
+        for name, _ in self.obj_channels.items():
+            slider = self.findChild(QtWidgets.QSlider, name)
+            print(slider.objectName(), slider.value())
+
+    def addChannelSelections(self):
         colors = [' (RED)', ' (GREEN)', ' (BLUE)']
-        for i, (k, v) in enumerate(obj_channels.items()):
+        for i, (k, v) in enumerate(self.obj_channels.items()):
+            # make overall vGroupBox
             tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
-            tempGroupBoxLayout = QtWidgets.QHBoxLayout()
-            tempGroupBox.setLayout(tempGroupBoxLayout)
+            tempGroupBoxVLayout = QtWidgets.QVBoxLayout()
+            tempGroupBox.setLayout(tempGroupBoxVLayout)
+            # make radio button hbox
+            tempRadioButtonHlayout = QtWidgets.QHBoxLayout()
             tempPositiveRadioButton = QtWidgets.QRadioButton('+ Marker')
             tempNegativeRadioButton = QtWidgets.QRadioButton('- Marker')
-            tempGroupBoxLayout.addWidget(tempPositiveRadioButton)
-            tempGroupBoxLayout.addWidget(tempNegativeRadioButton)
+            tempRadioButtonHlayout.addWidget(tempPositiveRadioButton)
+            tempRadioButtonHlayout.addWidget(tempNegativeRadioButton)
+            # make slider widget
+            tempSliderWidget = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
+            tempSliderWidget.setObjectName(k)
+            tempSliderWidget.valueChanged.connect(self.getSliderValues)
+            # add radio hbox to overall vGroupBox
+            tempGroupBoxVLayout.addLayout(tempRadioButtonHlayout)
+            # add slider widget to overall vGroupBox
+            tempGroupBoxVLayout.addWidget(tempSliderWidget)
             self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
             self.HBlayout.addWidget(tempGroupBox)
+            self.channelSliders[k] = tempSliderWidget
         self.HBlayout.addWidget(self.autoAnnotatePushbutton)
 
     def autoAnnotate(self):
@@ -306,18 +335,19 @@ class Window(QtWidgets.QWidget):
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
 
     def autoLocate(self):
-        obj_channels = get_obj_channels(self.directory)
+        self.obj_channels = get_obj_channels(self.directory)
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
 
-        for i, [k, v] in enumerate(obj_channels.items()):
+        for i, [k, v] in enumerate(self.obj_channels.items()):
             color = colors[i]
-            objs = obj_channels[k]
+            objs = self.obj_channels[k]
             for obj in objs:
                 s = (obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)
                 if 1E6 > s > 100:
                     self.viewer.scene.addRect(QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
                                                             , obj[0].stop - obj[0].start), color)
-        self.addChannelSelections(obj_channels)
+        self.addChannelSelections()
+
 
     def loadAnnotations(self):
         print('loading annotations...')
