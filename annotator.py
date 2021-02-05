@@ -187,8 +187,12 @@ class Window(QtWidgets.QWidget):
         self.obj_channels = None
 
     def loadImage(self):
+        # reset the gui for new image
         self.removeAllRects()
         self.channelComboBoxWidget.clear()
+        if self.channelGroupBoxes != {}:
+            self.removeChannelGroupBoxes()
+        # now setup gui with new image
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
         if len(ret) < 4:
             return
@@ -303,9 +307,12 @@ class Window(QtWidgets.QWidget):
         print('done')
 
     def getSliderValues(self, _):
+        channelThreshValues = {}
         for name, _ in self.obj_channels.items():
             slider = self.findChild(QtWidgets.QSlider, name)
-            print(slider.objectName(), slider.value())
+            channelThreshValues[name] = slider.value()
+        return channelThreshValues
+
 
     def addChannelSelections(self):
         colors = [' (RED)', ' (GREEN)', ' (BLUE)']
@@ -340,16 +347,16 @@ class Window(QtWidgets.QWidget):
             self.HBlayout.removeWidget(groupBox)
             sip.delete(groupBox)
             groupBox = None
-        # for k,v in self.obj_channels.items():
-        #     for item in self.HBlayout.item
+            self.channelGroupBoxes = {}
+        self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
 
     def autoAnnotate(self):
         for k, v in self.channelGroupBoxes.items():
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
 
     def autoLocate(self):
-        # TODO remove the previous boxes added to the gui so they dont get re-added each time this button is pressed
         if self.channelGroupBoxes != {}:
+            channelThreshValues = self.getSliderValues(None)
             self.removeChannelGroupBoxes()
         self.obj_channels = get_obj_channels(self.directory)
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
