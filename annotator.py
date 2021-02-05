@@ -356,6 +356,17 @@ class Window(QtWidgets.QWidget):
     def autoAnnotate(self):
         for k, v in self.channelGroupBoxes.items():
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
+        # unity = self.viewer.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
+        # self.viewer.scale(1 / unity.width(), 1 / unity.height())
+        # self.viewer.scale(.5, .5)
+        # viewrect = self.viewer.viewport().rect()
+        # scenerect = self.viewer.transform().mapRect(viewrect)
+        # factor = min(viewrect.width() / scenerect.width(),
+        #              viewrect.height() / scenerect.height())
+        # self.viewer.scale(factor, factor)
+        self.viewer.centerOn()
+
+        # self.viewer.setTransform()
 
     def autoLocate(self):
         self.removeAllRects()
