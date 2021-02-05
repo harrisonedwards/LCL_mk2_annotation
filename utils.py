@@ -52,22 +52,30 @@ def draw_objects(img, objs, color):
         cv2.rectangle(img,(obj[1].start,obj[0].start),(obj[1].stop,obj[0].stop), color, 3)
     return img
 
-def get_obj_channels(d):
+def get_obj_channels(d, channelThreshValues=None):
     '''
     takes a well image directory and returns the boxes for all of the fluorescence channels
     '''
     obj_channels = {}
-
+    tempDict = {}
     color_name = ['red', 'green', 'blue']
     i = 0
     for f in os.listdir(d):
         if '.tif' in f and 'Default' not in f:
-            print('processing:', f.split('-')[-1].split('.tif')[0], 'to be boxed in', color_name[i])
+            name = f.split('-')[-1].split('.tif')[0]
+            print('processing:', name, 'to be boxed in', color_name[i])
             img = cv2.imread(os.path.join(d, f), 0)
-            objs = get_objs(img, np.median(img) + 3 * scipy.stats.iqr(img))
-            obj_channels[f.split('-')[-1].split('.tif')[0]] = objs
+            if channelThreshValues != None:
+                # threshold on the values we have input
+                objs = get_objs(img, channelThreshValues[name])
+                tempDict[name] = channelThreshValues[name]
+            else:
+                # otherwise threshold on the preset, and return it
+                objs = get_objs(img, np.median(img) + 3 * scipy.stats.iqr(img))
+                tempDict[name] = np.median(img) + 3 * scipy.stats.iqr(img)
+            obj_channels[name] = objs
             i += 1
-    return obj_channels
+    return obj_channels, tempDict
 
 def draw_all_channels(d):
     '''

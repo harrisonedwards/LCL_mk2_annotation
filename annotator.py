@@ -314,9 +314,9 @@ class Window(QtWidgets.QWidget):
         return channelThreshValues
 
 
-    def addChannelSelections(self):
+    def addChannelSelections(self, channelThreshValues):
         colors = [' (RED)', ' (GREEN)', ' (BLUE)']
-        for i, (k, v) in enumerate(self.obj_channels.items()):
+        for i, (k, _) in enumerate(self.obj_channels.items()):
             # make overall vGroupBox
             tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
             tempGroupBox.setObjectName(k + 'GroupBox')
@@ -331,7 +331,10 @@ class Window(QtWidgets.QWidget):
             # make slider widget
             tempSliderWidget = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
             tempSliderWidget.setObjectName(k)
-            tempSliderWidget.valueChanged.connect(self.getSliderValues)
+            tempSliderWidget.setMaximum(255)
+            tempSliderWidget.setMinimum(0)
+            # tempSliderWidget.valueChanged.connect(self.getSliderValues)
+            tempSliderWidget.setSliderPosition(int(channelThreshValues[k]))
             # add radio hbox to overall vGroupBox
             tempGroupBoxVLayout.addLayout(tempRadioButtonHlayout)
             # add slider widget to overall vGroupBox
@@ -355,10 +358,16 @@ class Window(QtWidgets.QWidget):
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
 
     def autoLocate(self):
+        self.removeAllRects()
         if self.channelGroupBoxes != {}:
+            # if we do have channel group boxes
             channelThreshValues = self.getSliderValues(None)
             self.removeChannelGroupBoxes()
-        self.obj_channels = get_obj_channels(self.directory)
+            self.obj_channels, channelThreshValues = get_obj_channels(self.directory, channelThreshValues)
+        elif self.channelGroupBoxes == {}:
+            # if we dont have channel group boxes
+            self.obj_channels, channelThreshValues = get_obj_channels(self.directory)
+        self.addChannelSelections(channelThreshValues)
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
         for i, [k, v] in enumerate(self.obj_channels.items()):
             color = colors[i]
@@ -368,7 +377,7 @@ class Window(QtWidgets.QWidget):
                 if 1E6 > s > 100:
                     self.viewer.scene.addRect(QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
                                                             , obj[0].stop - obj[0].start), color)
-        self.addChannelSelections()
+
 
 
     def loadAnnotations(self):
