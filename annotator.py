@@ -186,6 +186,7 @@ class Window(QtWidgets.QWidget):
         self.obj_channels = None
 
     def loadImage(self):
+        # TODO: make this reinitialize the gui so that boxes are erased and channel images are cleared
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
         if len(ret) < 4:
             return
@@ -205,7 +206,7 @@ class Window(QtWidgets.QWidget):
             self.channelComboBoxWidget.setCurrentText('Default')
             self.viewer.setPhoto(QtGui.QPixmap(self.channels['Default']))
         else:
-            channel = self.channels.keys()[0]
+            channel = list(self.channels.keys())[0]
             self.channelComboBoxWidget.setCurrentText(channel)
             self.viewer.setPhoto(QtGui.QPixmap(self.channels[channel]))
         self.viewer.zoom = 0
@@ -263,10 +264,8 @@ class Window(QtWidgets.QWidget):
         print('deleting annotation')
 
     def removeAllRects(self):
-        # TODO make this work...
         for item in self.viewer.scene.items():
-            print(item)
-            if item.type() == QtWidgets.QGraphicsRectItem:
+            if item.type() == 3:
                 self.viewer.scene.removeItem(item)
 
     def deleteAnnotation(self, pos):
@@ -335,6 +334,7 @@ class Window(QtWidgets.QWidget):
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
 
     def autoLocate(self):
+        # TODO remove the previous boxes added to the gui so they dont get re-added each time this button is pressed
         self.obj_channels = get_obj_channels(self.directory)
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
 

@@ -17,3 +17,5 @@ shiboken2==5.15.0
 six==1.15.0
 virtualenv==16.7.7
 virtualenv-clone==0.5.3
+opencv-python~=4.5.1.48
+scikit-image~=0.18.1
