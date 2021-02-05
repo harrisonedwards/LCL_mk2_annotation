@@ -6,6 +6,7 @@ from PIL import Image
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 from utils import get_unique_names, get_all_paths_and_channels, get_obj_channels, validateDirectoryFormat
+import sip
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -311,6 +312,7 @@ class Window(QtWidgets.QWidget):
         for i, (k, v) in enumerate(self.obj_channels.items()):
             # make overall vGroupBox
             tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
+            tempGroupBox.setObjectName(k + 'GroupBox')
             tempGroupBoxVLayout = QtWidgets.QVBoxLayout()
             tempGroupBox.setLayout(tempGroupBoxVLayout)
             # make radio button hbox
@@ -332,15 +334,25 @@ class Window(QtWidgets.QWidget):
             self.channelSliders[k] = tempSliderWidget
         self.HBlayout.addWidget(self.autoAnnotatePushbutton)
 
+    def removeChannelGroupBoxes(self):
+        for name, _ in self.obj_channels.items():
+            groupBox = self.findChild(QtWidgets.QGroupBox, name + 'GroupBox')
+            self.HBlayout.removeWidget(groupBox)
+            sip.delete(groupBox)
+            groupBox = None
+        # for k,v in self.obj_channels.items():
+        #     for item in self.HBlayout.item
+
     def autoAnnotate(self):
         for k, v in self.channelGroupBoxes.items():
             print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
 
     def autoLocate(self):
         # TODO remove the previous boxes added to the gui so they dont get re-added each time this button is pressed
+        if self.channelGroupBoxes != {}:
+            self.removeChannelGroupBoxes()
         self.obj_channels = get_obj_channels(self.directory)
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
-
         for i, [k, v] in enumerate(self.obj_channels.items()):
             color = colors[i]
             objs = self.obj_channels[k]
