@@ -186,7 +186,8 @@ class Window(QtWidgets.QWidget):
         self.obj_channels = None
 
     def loadImage(self):
-        # TODO: make this reinitialize the gui so that boxes are erased and channel images are cleared
+        self.removeAllRects()
+        self.channelComboBoxWidget.clear()
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
         if len(ret) < 4:
             return
@@ -231,6 +232,8 @@ class Window(QtWidgets.QWidget):
             print(self.annotations)
 
     def changeChannel(self, channel):
+        if channel == '':
+            return
         tf = self.viewer.transform()
         self.viewer.setPhoto(QtGui.QPixmap(os.path.join(self.channels[channel])), True)
         self.viewer.setTransform(tf)
