@@ -185,6 +185,7 @@ class Window(QtWidgets.QWidget):
         self.channelGroupBoxes = {}
         self.channelSliders = {}
         self.obj_channels = None
+        self.annotateComboBox = None
 
     def loadImage(self):
         # reset the gui for new image
@@ -342,7 +343,16 @@ class Window(QtWidgets.QWidget):
             self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
             self.HBlayout.addWidget(tempGroupBox)
             self.channelSliders[k] = tempSliderWidget
-        self.HBlayout.addWidget(self.autoAnnotatePushbutton)
+        self.annotateComboBox = QtWidgets.QComboBox()
+        for obj in self.obj_channels['dapi']:
+            # QtCore.QRectF()
+            # QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
+            #               , obj[0].stop - obj[0].start)
+            x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
+            y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
+            self.annotateComboBox.addItem(f'{x}, {y}')
+        self.HBlayout.addWidget(self.annotateComboBox)
+        self.annotateComboBox.currentTextChanged.connect(self.autoAnnotate)
 
     def removeChannelGroupBoxes(self):
         for name, _ in self.obj_channels.items():
@@ -353,9 +363,9 @@ class Window(QtWidgets.QWidget):
             self.channelGroupBoxes = {}
         self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
 
-    def autoAnnotate(self):
-        for k, v in self.channelGroupBoxes.items():
-            print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
+    def autoAnnotate(self, text):
+        # for k, v in self.channelGroupBoxes.items():
+        #     print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
         # unity = self.viewer.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
         # self.viewer.scale(1 / unity.width(), 1 / unity.height())
         # self.viewer.scale(.5, .5)
@@ -364,7 +374,9 @@ class Window(QtWidgets.QWidget):
         # factor = min(viewrect.width() / scenerect.width(),
         #              viewrect.height() / scenerect.height())
         # self.viewer.scale(factor, factor)
-        self.viewer.centerOn()
+        x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
+        # get our center areas
+        self.viewer.centerOn(x,y)
 
         # self.viewer.setTransform()
 
@@ -378,16 +390,22 @@ class Window(QtWidgets.QWidget):
         elif self.channelGroupBoxes == {}:
             # if we dont have channel group boxes
             self.obj_channels, channelThreshValues = get_obj_channels(self.directory)
-        self.addChannelSelections(channelThreshValues)
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
+        temp_items = {}
         for i, [k, v] in enumerate(self.obj_channels.items()):
             color = colors[i]
             objs = self.obj_channels[k]
+            temp_items[k] = []
             for obj in objs:
                 s = (obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)
+                # filter out super large and super small boxes
                 if 1E6 > s > 100:
                     self.viewer.scene.addRect(QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
                                                             , obj[0].stop - obj[0].start), color)
+                    temp_items[k].append(obj)
+        self.obj_channels = temp_items
+        self.addChannelSelections(channelThreshValues)
+
 
 
 
