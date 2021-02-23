@@ -66,7 +66,6 @@ class PhotoViewer(QtWidgets.QGraphicsView):
         self.fitInView()
 
     def wheelEvent(self, event):
-        print(self.transform())
         if self.hasPhoto():
             if event.angleDelta().y() > 0:
                 # positive zoom case
@@ -187,6 +186,8 @@ class Window(QtWidgets.QWidget):
 
     def toggleAssistedAnnotation(self):
         if self.annotationAssistPushButton.isChecked():
+            self.viewer.toggleDragMode(False)
+            self.annotateNoneRadioButton.setEnabled(False)
             # add the list of auto located dapi things
             self.HBlayout.addWidget(self.locatedObjectsComboBox)
             self.locatedObjectsComboBox.setEnabled(True)
@@ -200,6 +201,8 @@ class Window(QtWidgets.QWidget):
             self.annotationAssistPushButton.setStyleSheet("background-color : lightblue")
             self.trackingAnnotations = True
         elif not self.annotationAssistPushButton.isChecked():
+            self.viewer.toggleDragMode(True)
+            self.annotateNoneRadioButton.setEnabled(False)
             self.locatedObjectsComboBox.setEnabled(False)
             # set it so we can only zoom directly in and out
             self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -256,7 +259,7 @@ class Window(QtWidgets.QWidget):
             self.removeChannelGroupBoxes()
         # now setup gui with new image
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing images for annotation"))
-
+        # TODO: improve ability to detect whether or not the directory is well-formed
         if len(ret) < 4:
             QMessageBox.about(self, "Error", "Invalid LCL Record Directory")
             return False
@@ -292,21 +295,19 @@ class Window(QtWidgets.QWidget):
                 self.annotations.append((self.annotationType, min_x, min_y, max_x, max_y))
 
                 if self.trackingAnnotations:
-                    # TODO this is relative to the full image, we need to get the upper left corner position of the
-                    #  image
                     ul = self.viewer.mapToScene(self.rect().topLeft())
                     br = self.viewer.mapToScene(self.rect().bottomRight())
                     zoom = self.viewer.zoom
                     idx = self.locatedObjectsComboBox.currentIndex()
                     obj = self.obj_channels['dapi'][idx]
-                    self.meta_annotations.append((ul, br, zoom, obj))
+                    self.meta_annotations.append((zoom, [int(i) for i in [ul.x(), ul.y(), br.x(), br.y()]],
+                                                  [obj[1].start, obj[0].start, obj[1].stop, obj[0].stop]))
+
                 else:
                     QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
                                                        "annotation assist.")
             if self.deletingAnnotations:
                 self.deleteAnnotation(pos)
-                # TODO add a means of deleting the meta annotation
-
             print('annotations:', self.annotations)
             print('meta annotations:', self.meta_annotations)
 
@@ -346,6 +347,7 @@ class Window(QtWidgets.QWidget):
         print('deleting annotation')
 
     def removeAllRects(self):
+        # TODO: make this only remove non-annotation rectangles
         for item in self.viewer.scene.items():
             if item.type() == 3:
                 self.viewer.scene.removeItem(item)
@@ -353,13 +355,23 @@ class Window(QtWidgets.QWidget):
     def deleteAnnotation(self, pos):
         rect = self.viewer.scene.itemAt(pos, QtGui.QTransform())
         if type(rect) != QtWidgets.QGraphicsPixmapItem:
-            for annotation in self.annotations:
-                if annotation[1] < pos.x() < annotation[3] and annotation[2] < pos.y() < annotation[4]:
-                    self.viewer.scene.removeItem(rect)
-                    self.annotations.remove(annotation)
-                    print('deleting:', annotation)
+            if len(self.annotations) == len(self.meta_annotations):
+                for i, annotation in enumerate(self.annotations):
+                    if annotation[1] < pos.x() < annotation[3] and annotation[2] < pos.y() < annotation[4]:
+                        self.annotations.remove(annotation)
+                        print('deleting:', annotation)
+                        print('and meta annotation:', self.meta_annotations.pop(i))
+            else:
+                for annotation in self.annotations:
+                    if annotation[1] < pos.x() < annotation[3] and annotation[2] < pos.y() < annotation[4]:
+                        self.annotations.remove(annotation)
+                        print('deleting:', annotation)
+            self.viewer.scene.removeItem(rect)
+
+
 
     def saveAnnotations(self):
+        # TODO: save all meta annotations as well
         fileName, _ = QFileDialog.getSaveFileName(self, "Enter location to save annotations", "", "Pickle files (*.p)")
         if fileName[-2:] != '.p':
             fileName += '.p'
