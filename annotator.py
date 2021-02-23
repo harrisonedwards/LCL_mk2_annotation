@@ -25,10 +25,8 @@ class PhotoViewer(QtWidgets.QGraphicsView):
         self.setScene(self.scene)
         self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-
         self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(30, 30, 30)))
         self.setFrameShape(QtWidgets.QFrame.NoFrame)
 
@@ -155,7 +153,7 @@ class Window(QtWidgets.QWidget):
         self.autoLocatePushButton.clicked.connect(self.autoLocate)
 
         self.autoAnnotatePushbutton = QtWidgets.QPushButton(text='Auto Annotate')
-        self.autoAnnotatePushbutton.clicked.connect(self.autoAnnotate)
+        self.autoAnnotatePushbutton.clicked.connect(self.snapToDapiLoc)
 
         # Arrange layout
         self.VBlayout = QtWidgets.QVBoxLayout(self)
@@ -179,10 +177,11 @@ class Window(QtWidgets.QWidget):
         self.channelSliders = {}
         self.obj_channels = None
         self.annotateComboBox = QtWidgets.QComboBox()
-        self.annotateComboBox.currentTextChanged.connect(self.autoAnnotate)
+        self.annotateComboBox.currentTextChanged.connect(self.snapToDapiLoc)
         self.annotationAssistPushButton = QtWidgets.QPushButton('Assisted Annotation')
         self.annotationAssistPushButton.setCheckable(True)
         self.annotationAssistPushButton.clicked.connect(self.toggleAssistedAnnotation)
+        self.trackingAnnotations = False
 
     def toggleAssistedAnnotation(self):
         if self.annotationAssistPushButton.isChecked():
@@ -191,20 +190,21 @@ class Window(QtWidgets.QWidget):
             self.annotateComboBox.setEnabled(True)
             # go to the first index of the auto located things
             text = self.annotateComboBox.currentText()
-            self.autoAnnotate(text)
+            self.snapToDapiLoc(text)
             # set it so we can only zoom directly in and out
             self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
             self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
             # change the color of the toggle
             self.annotationAssistPushButton.setStyleSheet("background-color : lightblue")
+            self.trackingAnnotations = True
         elif not self.annotationAssistPushButton.isChecked():
             self.annotateComboBox.setEnabled(False)
-
             # set it so we can only zoom directly in and out
             self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
             self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
             # change the color of the toggle
             self.annotationAssistPushButton.setStyleSheet("background-color : lightgrey")
+            self.trackingAnnotations = True
 
     def autoLocate(self):
         self.removeAllRects()
@@ -232,6 +232,10 @@ class Window(QtWidgets.QWidget):
         self.obj_channels = temp_items
         self.addChannelSelections(channelThreshValues)
         self.HBlayout.addWidget(self.annotationAssistPushButton)
+
+    def snapToDapiLoc(self, text):
+        x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
+        self.viewer.centerOn(x, y)
 
 
     def startAnnotating(self):
@@ -280,11 +284,24 @@ class Window(QtWidgets.QWidget):
                 min_y = min(pos.y(), self.rect_start[1])
                 max_x = max(pos.x(), self.rect_start[0])
                 max_y = max(pos.y(), self.rect_start[1])
+
                 self.viewer.scene.addRect(QtCore.QRectF(min_x, min_y, max_x - min_x, max_y - min_y),
                                           self.annotation_pen)
                 self.annotations.append((self.annotationType, min_x, min_y, max_x, max_y))
+
+                if self.trackingAnnotations:
+                    # TODO this is relative to the full image, we need to get the upper left corner position of the
+                    #  image
+                    xc = min_x + (max_x - min_x)/2
+                    yc = min_y + (max_y - min_y)/2
+                    w = max_x - min_x
+                    h = max_y - min_y
+                    zoom = self.viewer.zoom
+                    # TODO get full current image
+
             if self.deletingAnnotations:
                 self.deleteAnnotation(pos)
+
             print(self.annotations)
 
     def changeChannel(self, channel):
@@ -411,10 +428,7 @@ class Window(QtWidgets.QWidget):
             self.channelGroupBoxes = {}
         self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
 
-    def autoAnnotate(self, text):
-        x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
-        # get our center areas
-        self.viewer.centerOn(x, y)
+
 
 
 
