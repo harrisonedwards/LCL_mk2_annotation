@@ -66,6 +66,7 @@ class PhotoViewer(QtWidgets.QGraphicsView):
         self.fitInView()
 
     def wheelEvent(self, event):
+        print(self.transform())
         if self.hasPhoto():
             if event.angleDelta().y() > 0:
                 # positive zoom case
@@ -173,11 +174,12 @@ class Window(QtWidgets.QWidget):
         self.deletingAnnotations = False
         self.annotationType = 'None'
         self.annotations = []
+        self.meta_annotations = []
         self.channelGroupBoxes = {}
         self.channelSliders = {}
         self.obj_channels = None
-        self.annotateComboBox = QtWidgets.QComboBox()
-        self.annotateComboBox.currentTextChanged.connect(self.snapToDapiLoc)
+        self.locatedObjectsComboBox = QtWidgets.QComboBox()
+        self.locatedObjectsComboBox.currentTextChanged.connect(self.snapToDapiLoc)
         self.annotationAssistPushButton = QtWidgets.QPushButton('Assisted Annotation')
         self.annotationAssistPushButton.setCheckable(True)
         self.annotationAssistPushButton.clicked.connect(self.toggleAssistedAnnotation)
@@ -186,10 +188,10 @@ class Window(QtWidgets.QWidget):
     def toggleAssistedAnnotation(self):
         if self.annotationAssistPushButton.isChecked():
             # add the list of auto located dapi things
-            self.HBlayout.addWidget(self.annotateComboBox)
-            self.annotateComboBox.setEnabled(True)
+            self.HBlayout.addWidget(self.locatedObjectsComboBox)
+            self.locatedObjectsComboBox.setEnabled(True)
             # go to the first index of the auto located things
-            text = self.annotateComboBox.currentText()
+            text = self.locatedObjectsComboBox.currentText()
             self.snapToDapiLoc(text)
             # set it so we can only zoom directly in and out
             self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
@@ -198,7 +200,7 @@ class Window(QtWidgets.QWidget):
             self.annotationAssistPushButton.setStyleSheet("background-color : lightblue")
             self.trackingAnnotations = True
         elif not self.annotationAssistPushButton.isChecked():
-            self.annotateComboBox.setEnabled(False)
+            self.locatedObjectsComboBox.setEnabled(False)
             # set it so we can only zoom directly in and out
             self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
             self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -292,17 +294,21 @@ class Window(QtWidgets.QWidget):
                 if self.trackingAnnotations:
                     # TODO this is relative to the full image, we need to get the upper left corner position of the
                     #  image
-                    xc = min_x + (max_x - min_x)/2
-                    yc = min_y + (max_y - min_y)/2
-                    w = max_x - min_x
-                    h = max_y - min_y
+                    ul = self.viewer.mapToScene(self.rect().topLeft())
+                    br = self.viewer.mapToScene(self.rect().bottomRight())
                     zoom = self.viewer.zoom
-                    # TODO get full current image
-
+                    idx = self.locatedObjectsComboBox.currentIndex()
+                    obj = self.obj_channels['dapi'][idx]
+                    self.meta_annotations.append((ul, br, zoom, obj))
+                else:
+                    QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
+                                                       "annotation assist.")
             if self.deletingAnnotations:
                 self.deleteAnnotation(pos)
+                # TODO add a means of deleting the meta annotation
 
-            print(self.annotations)
+            print('annotations:', self.annotations)
+            print('meta annotations:', self.meta_annotations)
 
     def changeChannel(self, channel):
         if channel == '':
@@ -409,14 +415,14 @@ class Window(QtWidgets.QWidget):
             self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
             self.HBlayout.addWidget(tempGroupBox)
             self.channelSliders[k] = tempSliderWidget
-        if self.annotateComboBox is not None:
-            self.HBlayout.removeWidget(self.annotateComboBox)
+        if self.locatedObjectsComboBox is not None:
+            self.HBlayout.removeWidget(self.locatedObjectsComboBox)
         # setup extra gui elements
         # TODO: remove all items first before repopulating
         for obj in self.obj_channels['dapi']:
             x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
             y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
-            self.annotateComboBox.addItem(f'{x}, {y}')
+            self.locatedObjectsComboBox.addItem(f'{x}, {y}')
 
 
     def removeChannelGroupBoxes(self):
