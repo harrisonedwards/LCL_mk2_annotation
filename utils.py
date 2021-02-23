@@ -12,18 +12,20 @@ def get_unique_names(directory):
     files = os.listdir(directory)
     fl = []
     for f in files:
-        if '.yml' not in f and 'stitched' not in f and '.jpg' not in f and os.path.isfile(os.path.join(directory, f)):
+        if '.tif' in f and os.path.isfile(os.path.join(directory, f)):
             fl.append(f.rpartition('-')[0])
     return set(fl), files
 
 
-def get_all_paths_and_channels(directory, selection, fl):
+def get_all_paths_and_channels(directory):
     paths, channels = [], []
-    for f in fl:
-        if f.rpartition('-')[0] == selection:
+    for f in os.listdir(directory):
+        if '.tif' in f and os.path.isfile(os.path.join(directory, f)):
             paths.append(os.path.join(directory, f))
-            channels.append(f.rpartition('-')[2].rpartition('.tif')[0])
+            # channels.append(f.rpartition('-')[2].rpartition('.tif')[0])
+            channels.append(f.rpartition('__')[2][13:].rpartition('.tif')[0])
     return dict(zip(channels, paths))
+
 
 
 def main():

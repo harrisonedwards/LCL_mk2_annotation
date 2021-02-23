@@ -51,7 +51,6 @@ class PhotoViewer(QtWidgets.QGraphicsView):
                 self.scale(factor, factor)
             # self._zoom = 0
 
-
         self.scene.update()
 
     def setPhoto(self, pixmap=None, channel_change=False):
@@ -127,12 +126,11 @@ class Window(QtWidgets.QWidget):
         self.channelComboBoxWidget = QtWidgets.QComboBox()
         self.channelComboBoxWidget.setFixedWidth(150)
         self.channelComboBoxWidget.currentTextChanged.connect(self.changeChannel)
-
         self.annotationGroupBox = QtWidgets.QGroupBox('Annotation')
         self.annotateGroupBoxLayout = QtWidgets.QHBoxLayout()
         self.annotationGroupBox.setLayout(self.annotateGroupBoxLayout)
 
-        self.annotateNoneRadioButton = QtWidgets.QRadioButton('None')
+        self.annotateNoneRadioButton = QtWidgets.QRadioButton('Drag Mode')
         self.annotateNoneRadioButton.setChecked(True)
         self.annotateNoneRadioButton.pressed.connect(self.annotateNone)
         self.annotatePositiveRadioButton = QtWidgets.QRadioButton('Positive')
@@ -162,19 +160,14 @@ class Window(QtWidgets.QWidget):
         # Arrange layout
         self.VBlayout = QtWidgets.QVBoxLayout(self)
         self.VBlayout.addWidget(self.viewer)
-
         self.HBlayout = QtWidgets.QHBoxLayout()
         self.HBlayout.setAlignment(QtCore.Qt.AlignLeft)
-
         self.HBlayout.addWidget(self.btnLoad)
-        self.HBlayout.addWidget(self.removeRectPushbutton)
         self.HBlayout.addWidget(self.channelLabel)
         self.HBlayout.addWidget(self.channelComboBoxWidget)
 
-        self.HBlayout.addWidget(self.annotationGroupBox)
         # self.HBlayout.addWidget(self.loadAnnotationPushButton)
-        self.HBlayout.addWidget(self.saveAnnotationPushButton)
-        self.HBlayout.addWidget(self.autoLocatePushButton)
+
         self.VBlayout.addLayout(self.HBlayout)
         self.channels = {}
         self.rect_start = []
@@ -185,7 +178,69 @@ class Window(QtWidgets.QWidget):
         self.channelGroupBoxes = {}
         self.channelSliders = {}
         self.obj_channels = None
-        self.annotateComboBox = None
+        self.annotateComboBox = QtWidgets.QComboBox()
+        self.annotateComboBox.currentTextChanged.connect(self.autoAnnotate)
+        self.annotationAssistPushButton = QtWidgets.QPushButton('Assisted Annotation')
+        self.annotationAssistPushButton.setCheckable(True)
+        self.annotationAssistPushButton.clicked.connect(self.toggleAssistedAnnotation)
+
+    def toggleAssistedAnnotation(self):
+        if self.annotationAssistPushButton.isChecked():
+            # add the list of auto located dapi things
+            self.HBlayout.addWidget(self.annotateComboBox)
+            self.annotateComboBox.setEnabled(True)
+            # go to the first index of the auto located things
+            text = self.annotateComboBox.currentText()
+            self.autoAnnotate(text)
+            # set it so we can only zoom directly in and out
+            self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
+            self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
+            # change the color of the toggle
+            self.annotationAssistPushButton.setStyleSheet("background-color : lightblue")
+        elif not self.annotationAssistPushButton.isChecked():
+            self.annotateComboBox.setEnabled(False)
+
+            # set it so we can only zoom directly in and out
+            self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+            self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+            # change the color of the toggle
+            self.annotationAssistPushButton.setStyleSheet("background-color : lightgrey")
+
+    def autoLocate(self):
+        self.removeAllRects()
+        if self.channelGroupBoxes != {}:
+            # if we do have channel group boxes
+            channelThreshValues = self.getSliderValues(None)
+            self.removeChannelGroupBoxes()
+            self.obj_channels, channelThreshValues = get_obj_channels(self.directory, channelThreshValues)
+        elif self.channelGroupBoxes == {}:
+            # if we dont have channel group boxes
+            self.obj_channels, channelThreshValues = get_obj_channels(self.directory)
+        colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
+        temp_items = {}
+        for i, [k, v] in enumerate(self.obj_channels.items()):
+            color = colors[i]
+            objs = self.obj_channels[k]
+            temp_items[k] = []
+            for obj in objs:
+                s = (obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)
+                # filter out super large and super small boxes
+                if 1E6 > s > 100:
+                    self.viewer.scene.addRect(QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
+                                                            , obj[0].stop - obj[0].start), color)
+                    temp_items[k].append(obj)
+        self.obj_channels = temp_items
+        self.addChannelSelections(channelThreshValues)
+        self.HBlayout.addWidget(self.annotationAssistPushButton)
+
+
+    def startAnnotating(self):
+        # add all of the necessary GUI elements for annotating
+        self.HBlayout.addWidget(self.annotationGroupBox)
+        self.HBlayout.addWidget(self.saveAnnotationPushButton)
+        self.HBlayout.addWidget(self.autoLocatePushButton)
+        self.HBlayout.addWidget(self.removeRectPushbutton)
+
 
     def loadImage(self):
         # reset the gui for new image
@@ -194,19 +249,13 @@ class Window(QtWidgets.QWidget):
         if self.channelGroupBoxes != {}:
             self.removeChannelGroupBoxes()
         # now setup gui with new image
-        ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing annotations"))
+        ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing images for annotation"))
+
         if len(ret) < 4:
-            return
-        else:
-            if validateDirectoryFormat(ret):
-                self.directory = ret
-            else:
-                QMessageBox.about(self, "Error", "Invalid LCL Record Directory")
-                return False
-        unique_names, fl = get_unique_names(self.directory)
-        selection, ok = QtWidgets.QInputDialog.getItem(
-            self, 'Select', 'Image set to annotate:', unique_names)
-        self.channels = get_all_paths_and_channels(self.directory, selection, fl)
+            QMessageBox.about(self, "Error", "Invalid LCL Record Directory")
+            return False
+        self.directory = ret
+        self.channels = get_all_paths_and_channels(self.directory)
         for channel in self.channels.keys():
             self.channelComboBoxWidget.addItem(channel)
         if 'Default' in self.channels.keys():
@@ -218,6 +267,7 @@ class Window(QtWidgets.QWidget):
             self.viewer.setPhoto(QtGui.QPixmap(self.channels[channel]))
         self.viewer.zoom = 0
         self.annotateNoneRadioButton.setChecked(True)
+        self.startAnnotating()
 
     def photoClicked(self, pos):
         if self.viewer.dragMode() == QtWidgets.QGraphicsView.NoDrag:
@@ -249,7 +299,7 @@ class Window(QtWidgets.QWidget):
         self.deletingAnnotations = False
         self.annotation_pen = QtGui.QColor(0, 0, 0)
         self.annotationType = 'None'
-        print('annotating None')
+        print('Dragging Mode')
 
     def annotatePositive(self):
         self.viewer.toggleDragMode(False)
@@ -314,7 +364,6 @@ class Window(QtWidgets.QWidget):
             channelThreshValues[name] = slider.value()
         return channelThreshValues
 
-
     def addChannelSelections(self, channelThreshValues):
         colors = [' (RED)', ' (GREEN)', ' (BLUE)']
         for i, (k, _) in enumerate(self.obj_channels.items()):
@@ -343,16 +392,15 @@ class Window(QtWidgets.QWidget):
             self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
             self.HBlayout.addWidget(tempGroupBox)
             self.channelSliders[k] = tempSliderWidget
-        self.annotateComboBox = QtWidgets.QComboBox()
+        if self.annotateComboBox is not None:
+            self.HBlayout.removeWidget(self.annotateComboBox)
+        # setup extra gui elements
+        # TODO: remove all items first before repopulating
         for obj in self.obj_channels['dapi']:
-            # QtCore.QRectF()
-            # QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
-            #               , obj[0].stop - obj[0].start)
             x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
             y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
             self.annotateComboBox.addItem(f'{x}, {y}')
-        self.HBlayout.addWidget(self.annotateComboBox)
-        self.annotateComboBox.currentTextChanged.connect(self.autoAnnotate)
+
 
     def removeChannelGroupBoxes(self):
         for name, _ in self.obj_channels.items():
@@ -364,48 +412,9 @@ class Window(QtWidgets.QWidget):
         self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
 
     def autoAnnotate(self, text):
-        # for k, v in self.channelGroupBoxes.items():
-        #     print(f'{k}: {self.channelGroupBoxes[k][0].isChecked()}, {self.channelGroupBoxes[k][1].isChecked()}')
-        # unity = self.viewer.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
-        # self.viewer.scale(1 / unity.width(), 1 / unity.height())
-        # self.viewer.scale(.5, .5)
-        # viewrect = self.viewer.viewport().rect()
-        # scenerect = self.viewer.transform().mapRect(viewrect)
-        # factor = min(viewrect.width() / scenerect.width(),
-        #              viewrect.height() / scenerect.height())
-        # self.viewer.scale(factor, factor)
         x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
         # get our center areas
-        self.viewer.centerOn(x,y)
-
-        # self.viewer.setTransform()
-
-    def autoLocate(self):
-        self.removeAllRects()
-        if self.channelGroupBoxes != {}:
-            # if we do have channel group boxes
-            channelThreshValues = self.getSliderValues(None)
-            self.removeChannelGroupBoxes()
-            self.obj_channels, channelThreshValues = get_obj_channels(self.directory, channelThreshValues)
-        elif self.channelGroupBoxes == {}:
-            # if we dont have channel group boxes
-            self.obj_channels, channelThreshValues = get_obj_channels(self.directory)
-        colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
-        temp_items = {}
-        for i, [k, v] in enumerate(self.obj_channels.items()):
-            color = colors[i]
-            objs = self.obj_channels[k]
-            temp_items[k] = []
-            for obj in objs:
-                s = (obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)
-                # filter out super large and super small boxes
-                if 1E6 > s > 100:
-                    self.viewer.scene.addRect(QtCore.QRectF(obj[1].start, obj[0].start, obj[1].stop - obj[1].start
-                                                            , obj[0].stop - obj[0].start), color)
-                    temp_items[k].append(obj)
-        self.obj_channels = temp_items
-        self.addChannelSelections(channelThreshValues)
-
+        self.viewer.centerOn(x, y)
 
 
 

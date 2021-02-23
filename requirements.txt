@@ -19,3 +19,9 @@ virtualenv==16.7.7
 virtualenv-clone==0.5.3
 opencv-python~=4.5.1.48
 scikit-image~=0.18.1
+pip~=21.0.1
+zlib~=1.2.11
+wheel~=0.36.2
+openssl~=1.1.1j
+setuptools~=52.0.0
+future~=0.18.2

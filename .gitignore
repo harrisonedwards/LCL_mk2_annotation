@@ -10,3 +10,9 @@ venv/
 .p
 
 *.p
+
+venv_ms/
+
+hexbin.html
+
+hex_tile.html
