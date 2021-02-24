@@ -202,7 +202,7 @@ class Window(QtWidgets.QWidget):
             self.trackingAnnotations = True
         elif not self.annotationAssistPushButton.isChecked():
             self.viewer.toggleDragMode(True)
-            self.annotateNoneRadioButton.setEnabled(False)
+            self.annotateNoneRadioButton.setEnabled(True)
             self.locatedObjectsComboBox.setEnabled(False)
             # set it so we can only zoom directly in and out
             self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -300,8 +300,7 @@ class Window(QtWidgets.QWidget):
                     idx = self.locatedObjectsComboBox.currentIndex()
                     obj = self.obj_channels['dapi'][idx]
                     self.meta_annotations.append((zoom, [int(i) for i in [ul.x(), ul.y(), br.x(), br.y()]],
-                                                  [obj[1].start, obj[0].start, obj[1].stop, obj[0].stop]))
-
+                                                  [(obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)]))
                 else:
                     QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
                                                        "annotation assist.")
@@ -370,23 +369,31 @@ class Window(QtWidgets.QWidget):
             self.viewer.scene.removeItem(rect)
 
     def saveAnnotations(self):
-        # TODO: save all meta annotations as well
         fileName, _ = QFileDialog.getSaveFileName(self, "Enter location to save annotations", "", "Pickle files (*.p)")
         if fileName[-2:] != '.p':
             fileName += '.p'
         print('saving annotations...', fileName)
-        # build a pickle that has a list of tuples of form ([annotation type], [channel list], [loc_x, loc_y] [array
-        # of shape (x, y, channels)])
+        # build a pickle that has a list of tuples of form ([annotation type], [channel list],
+        # [loc_x, loc_y], [annotation array of shape (x, y, channels)],
+        # [meta_annotation array of shape (x, y, channels)])
         save_list = []
-        for annotation in self.annotations:
+        for annotation, meta_annotation in zip(self.annotations, self.meta_annotations):
             temp_tuple = (annotation[0], list(self.channels.keys()))
             # Qt and numpy change X and Y...
-            annotation_array = np.zeros((annotation[4] - annotation[2], annotation[3] - annotation[1],
+            annotation_array = np.zeros((annotation[4] - annotation[2],
+                                         annotation[3] - annotation[1],
                                          len(self.channels.keys())))
+            # switching this here to get the actual array
+            meta_annotation = meta_annotation[1]
+            meta_annotation_array = np.zeros((meta_annotation[3] - meta_annotation[1],
+                                              meta_annotation[2] - meta_annotation[0],
+                                              len(self.channels.keys())))
             for i, channel in enumerate(self.channels.keys()):
                 img = np.array(Image.open(self.channels[channel]))
                 annotation_array[:, :, i] = img[annotation[2]:annotation[4], annotation[1]:annotation[3]]
-                temp_tuple += (annotation_array,)
+                meta_annotation_array[:, :, i] = img[meta_annotation[1]:meta_annotation[3],
+                                                     meta_annotation[0]:meta_annotation[2]]
+                temp_tuple += (annotation_array, meta_annotation_array)
             save_list.append(temp_tuple)
         pickle.dump(save_list, open(fileName, 'wb'))
         print('done')
