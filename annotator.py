@@ -114,10 +114,10 @@ class Window(QtWidgets.QWidget):
 
         # 'Load image' button
         self.btnLoad = QtWidgets.QToolButton(self)
-        self.btnLoad.setText('Open Image Directory')
+        self.btnLoad.setText('Open Image\nDirectory')
         self.btnLoad.clicked.connect(self.loadImage)
 
-        self.removeRectPushbutton = QtWidgets.QPushButton(text='Remove Rectangles')
+        self.removeRectPushbutton = QtWidgets.QPushButton(text='Delete Rectangles\nand Annotations')
         self.removeRectPushbutton.clicked.connect(self.removeAllRects)
 
         self.channelLabel = QtWidgets.QLabel(text='Channel:')
@@ -143,16 +143,16 @@ class Window(QtWidgets.QWidget):
         self.annotateGroupBoxLayout.addWidget(self.annotateNegativeRadioButton)
         self.annotateGroupBoxLayout.addWidget(self.deleteAnnotationRadioButton)
 
-        self.loadAnnotationPushButton = QtWidgets.QPushButton(text='Load Annotations')
+        self.loadAnnotationPushButton = QtWidgets.QPushButton(text='Load\nAnnotations')
         self.loadAnnotationPushButton.clicked.connect(self.loadAnnotations)
 
-        self.saveAnnotationPushButton = QtWidgets.QPushButton(text='Save Annotations')
+        self.saveAnnotationPushButton = QtWidgets.QPushButton(text='Save\nAnnotations')
         self.saveAnnotationPushButton.clicked.connect(self.saveAnnotations)
 
-        self.autoLocatePushButton = QtWidgets.QPushButton(text='Auto Find')
+        self.autoLocatePushButton = QtWidgets.QPushButton(text='Auto\nFind')
         self.autoLocatePushButton.clicked.connect(self.autoLocate)
 
-        self.autoAnnotatePushbutton = QtWidgets.QPushButton(text='Auto Annotate')
+        self.autoAnnotatePushbutton = QtWidgets.QPushButton(text='Auto\nAnnotate')
         self.autoAnnotatePushbutton.clicked.connect(self.snapToDapiLoc)
 
         # Arrange layout
@@ -179,7 +179,7 @@ class Window(QtWidgets.QWidget):
         self.obj_channels = None
         self.locatedObjectsComboBox = QtWidgets.QComboBox()
         self.locatedObjectsComboBox.currentTextChanged.connect(self.snapToDapiLoc)
-        self.annotationAssistPushButton = QtWidgets.QPushButton('Assisted Annotation')
+        self.annotationAssistPushButton = QtWidgets.QPushButton('Assisted\nAnnotation')
         self.annotationAssistPushButton.setCheckable(True)
         self.annotationAssistPushButton.clicked.connect(self.toggleAssistedAnnotation)
         self.trackingAnnotations = False
@@ -242,14 +242,12 @@ class Window(QtWidgets.QWidget):
         x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
         self.viewer.centerOn(x, y)
 
-
     def startAnnotating(self):
         # add all of the necessary GUI elements for annotating
         self.HBlayout.addWidget(self.annotationGroupBox)
         self.HBlayout.addWidget(self.saveAnnotationPushButton)
         self.HBlayout.addWidget(self.autoLocatePushButton)
         self.HBlayout.addWidget(self.removeRectPushbutton)
-
 
     def loadImage(self):
         # reset the gui for new image
@@ -259,8 +257,9 @@ class Window(QtWidgets.QWidget):
             self.removeChannelGroupBoxes()
         # now setup gui with new image
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing images for annotation"))
-        # TODO: improve ability to detect whether or not the directory is well-formed
-        if len(ret) < 4:
+        if ret == '':
+            return
+        if not validateDirectoryFormat(ret):
             QMessageBox.about(self, "Error", "Invalid LCL Record Directory")
             return False
         self.directory = ret
@@ -328,14 +327,14 @@ class Window(QtWidgets.QWidget):
     def annotatePositive(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = False
-        self.annotation_pen = QtGui.QPen(QtGui.QColor(254, 211, 48), 8, QtCore.Qt.SolidLine)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(254, 211, 48), 4, QtCore.Qt.SolidLine)
         self.annotationType = 'Positive'
         print('annotating positive')
 
     def annotateNegative(self):
         self.viewer.toggleDragMode(False)
         self.deletingAnnotations = False
-        self.annotation_pen = QtGui.QPen(QtGui.QColor(165, 94, 234), 8, QtCore.Qt.SolidLine)
+        self.annotation_pen = QtGui.QPen(QtGui.QColor(165, 94, 234), 4, QtCore.Qt.SolidLine)
         self.annotationType = 'Negative'
         print('annotating negative')
 
@@ -348,6 +347,8 @@ class Window(QtWidgets.QWidget):
 
     def removeAllRects(self):
         # TODO: make this only remove non-annotation rectangles
+        self.annotations = []
+        self.meta_annotations = []
         for item in self.viewer.scene.items():
             if item.type() == 3:
                 self.viewer.scene.removeItem(item)
@@ -367,8 +368,6 @@ class Window(QtWidgets.QWidget):
                         self.annotations.remove(annotation)
                         print('deleting:', annotation)
             self.viewer.scene.removeItem(rect)
-
-
 
     def saveAnnotations(self):
         # TODO: save all meta annotations as well
@@ -436,7 +435,6 @@ class Window(QtWidgets.QWidget):
             y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
             self.locatedObjectsComboBox.addItem(f'{x}, {y}')
 
-
     def removeChannelGroupBoxes(self):
         for name, _ in self.obj_channels.items():
             groupBox = self.findChild(QtWidgets.QGroupBox, name + 'GroupBox')
@@ -445,10 +443,6 @@ class Window(QtWidgets.QWidget):
             groupBox = None
             self.channelGroupBoxes = {}
         self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
-
-
-
-
 
     def loadAnnotations(self):
         print('loading annotations...')

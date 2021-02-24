@@ -27,7 +27,6 @@ def get_all_paths_and_channels(directory):
     return dict(zip(channels, paths))
 
 
-
 def main():
     unique_names, fl = get_unique_names()
     s = '\n'.join(unique_names)
@@ -35,24 +34,27 @@ def main():
     channels = get_all_paths_and_channels(selection, fl)
     print(channels)
 
+
 def get_objs(img, thresh_val):
     '''
     takes a dapi image and returns list of slices with objects above the thresh_val
     '''
     # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     # img = clahe.apply(img)
-    _,thresh1 = cv2.threshold(img, thresh_val, 255, cv2.THRESH_BINARY)
+    _, thresh1 = cv2.threshold(img, thresh_val, 255, cv2.THRESH_BINARY)
     blobs_labels = measure.label(thresh1.astype(np.uint8), background=0)
     objs = scipy.ndimage.find_objects(blobs_labels)
     return objs
+
 
 def draw_objects(img, objs, color):
     '''
     takes a BF image and draws boxes over the objects in it, then returns it
     '''
     for obj in objs:
-        cv2.rectangle(img,(obj[1].start,obj[0].start),(obj[1].stop,obj[0].stop), color, 3)
+        cv2.rectangle(img, (obj[1].start, obj[0].start), (obj[1].stop, obj[0].stop), color, 3)
     return img
+
 
 def get_obj_channels(d, channelThreshValues=None):
     '''
@@ -79,6 +81,7 @@ def get_obj_channels(d, channelThreshValues=None):
             i += 1
     return obj_channels, tempDict
 
+
 def draw_all_channels(d):
     '''
     returns an image with all fluorescence channel boxes drawn on it
@@ -86,18 +89,25 @@ def draw_all_channels(d):
     obj_channels = get_obj_channels(d)
     for f in os.listdir(d):
         if '.tif' in f and 'Default' in f:
-            img = cv2.imread(os.path.join(d,f))
-    for i,[k,v] in enumerate(obj_channels.items()):
-        colors = [0,0,0]
+            img = cv2.imread(os.path.join(d, f))
+    for i, [k, v] in enumerate(obj_channels.items()):
+        colors = [0, 0, 0]
         colors[i] = 255
         img = draw_objects(img, obj_channels[k], colors)
     return img
 
+
 def validateDirectoryFormat(dir):
+    count = 0
     for f in os.listdir(dir):
         if '.yml' in f:
-            return True
+            count += 1
+        elif '.tif' in f:
+            count += 1
+    if count > 1:
+        return True
     return False
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Annotator for the LCL mk 2 system.')
