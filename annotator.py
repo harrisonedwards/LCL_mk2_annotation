@@ -106,17 +106,8 @@ class PhotoViewer(QtWidgets.QGraphicsView):
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super(Window, self).__init__()
-        # self.showFullScreen()
-        # titleBarHeight = self.style().pixelMetric(
-        #     QtGui.Qtst.PM_TitleBarHeight,
-        #     QtGui.QStyleOptionTitleBar(),
-        #     self
-        # )
-
-        geometry = app.desktop().availableGeometry()
-        # geometry.setHeight(geometry.height() - (titleBarHeight * 2))
-
-        self.setGeometry(geometry)
+        self.showMaximized()
+        
         self.directory = None
 
         self.viewer = PhotoViewer(self)
@@ -233,7 +224,7 @@ class Window(QtWidgets.QWidget):
         elif self.channelGroupBoxes == {}:
             # if we dont have channel group boxes
             self.obj_channels, channelThreshValues = get_obj_channels(self.directory)
-        colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255)]
+        colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255), QtGui.QColor(102, 51, 0)]
         temp_items = {}
         for i, [k, v] in enumerate(self.obj_channels.items()):
             color = colors[i]
@@ -417,7 +408,7 @@ class Window(QtWidgets.QWidget):
         return channelThreshValues
 
     def addChannelSelections(self, channelThreshValues):
-        colors = [' (RED)', ' (GREEN)', ' (BLUE)']
+        colors = [' (RED)', ' (GREEN)', ' (BLUE)', ' (BROWN)']
         for i, (k, _) in enumerate(self.obj_channels.items()):
             # make overall vGroupBox
             tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
