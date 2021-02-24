@@ -187,35 +187,49 @@ class Window(QtWidgets.QWidget):
         self.annotationAssistPushButton.clicked.connect(self.toggleAssistedAnnotation)
         self.trackingAnnotations = False
 
+    def stopAssistedAnnotation(self):
+        self.viewer.toggleDragMode(True)
+        self.annotateNoneRadioButton.setEnabled(True)
+        self.locatedObjectsComboBox.setEnabled(False)
+        self.annotationAssistPushButton.setChecked(False)
+        # set it so we can zoom on mouse
+        self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        # change the color of the toggle
+        self.annotationAssistPushButton.setStyleSheet("background-color : lightgrey")
+        self.trackingAnnotations = False
+
+    def startAssistedAnnotation(self):
+        text = self.locatedObjectsComboBox.currentText()
+        if text == '':
+            return
+        self.viewer.toggleDragMode(False)
+        self.annotateNoneRadioButton.setEnabled(False)
+        # add the list of auto located dapi things
+        self.locatedObjectsComboBox.setEnabled(True)
+        # go to the first index of the auto located things
+
+
+        self.snapToDapiLoc(text)
+        # set it so we can only zoom directly in and out
+        self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
+        self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
+        # change the color of the toggle
+        self.annotationAssistPushButton.setStyleSheet("background-color : lightblue")
+        self.trackingAnnotations = True
+
     def toggleAssistedAnnotation(self):
         if self.annotationAssistPushButton.isChecked():
-            self.viewer.toggleDragMode(False)
-            self.annotateNoneRadioButton.setEnabled(False)
-            # add the list of auto located dapi things
-            self.HBlayout.addWidget(self.locatedObjectsComboBox)
-            self.locatedObjectsComboBox.setEnabled(True)
-            # go to the first index of the auto located things
-            text = self.locatedObjectsComboBox.currentText()
-            self.snapToDapiLoc(text)
-            # set it so we can only zoom directly in and out
-            self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
-            self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
-            # change the color of the toggle
-            self.annotationAssistPushButton.setStyleSheet("background-color : lightblue")
-            self.trackingAnnotations = True
+            self.startAssistedAnnotation()
         elif not self.annotationAssistPushButton.isChecked():
-            self.viewer.toggleDragMode(True)
-            self.annotateNoneRadioButton.setEnabled(True)
-            self.locatedObjectsComboBox.setEnabled(False)
-            # set it so we can only zoom directly in and out
-            self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-            self.viewer.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-            # change the color of the toggle
-            self.annotationAssistPushButton.setStyleSheet("background-color : lightgrey")
-            self.trackingAnnotations = True
+            self.stopAssistedAnnotation()
+
+
 
     def autoLocate(self):
         self.removeAllRects()
+        self.stopAssistedAnnotation()
+        self.locatedObjectsComboBox.clear()
         if self.channelGroupBoxes != {}:
             # if we do have channel group boxes
             channelThreshValues = self.getSliderValues(None)
@@ -240,10 +254,13 @@ class Window(QtWidgets.QWidget):
         self.obj_channels = temp_items
         self.addChannelSelections(channelThreshValues)
         self.HBlayout.addWidget(self.annotationAssistPushButton)
+        self.HBlayout.addWidget(self.locatedObjectsComboBox)
+        self.locatedObjectsComboBox.setEnabled(False)
 
     def snapToDapiLoc(self, text):
-        x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
-        self.viewer.centerOn(x, y)
+        if self.annotationAssistPushButton.isChecked():
+            x, y = int(text.split(', ')[0]), int(text.split(', ')[1])
+            self.viewer.centerOn(x, y)
 
     def startAnnotating(self):
         # add all of the necessary GUI elements for annotating

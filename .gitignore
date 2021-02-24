@@ -20,3 +20,9 @@ hex_tile.html
 venv_ms2/
 
 .ipynb_checkpoints/
+
+build/
+
+dist/
+
+annotator.spec
