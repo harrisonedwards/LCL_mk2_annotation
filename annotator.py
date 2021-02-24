@@ -106,6 +106,17 @@ class PhotoViewer(QtWidgets.QGraphicsView):
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super(Window, self).__init__()
+        # self.showFullScreen()
+        # titleBarHeight = self.style().pixelMetric(
+        #     QtGui.Qtst.PM_TitleBarHeight,
+        #     QtGui.QStyleOptionTitleBar(),
+        #     self
+        # )
+
+        geometry = app.desktop().availableGeometry()
+        # geometry.setHeight(geometry.height() - (titleBarHeight * 2))
+
+        self.setGeometry(geometry)
         self.directory = None
 
         self.viewer = PhotoViewer(self)
@@ -163,6 +174,7 @@ class Window(QtWidgets.QWidget):
         self.HBlayout.addWidget(self.btnLoad)
         self.HBlayout.addWidget(self.channelLabel)
         self.HBlayout.addWidget(self.channelComboBoxWidget)
+
 
         # self.HBlayout.addWidget(self.loadAnnotationPushButton)
 
@@ -374,8 +386,7 @@ class Window(QtWidgets.QWidget):
             fileName += '.p'
         print('saving annotations...', fileName)
         # build a pickle that has a list of tuples of form ([annotation type], [channel list],
-        # [loc_x, loc_y], [annotation array of shape (x, y, channels)],
-        # [meta_annotation array of shape (x, y, channels)])
+        # [annotation array of shape (x, y, channels)], [meta_annotation array of shape (x, y, channels)])
         save_list = []
         for annotation, meta_annotation in zip(self.annotations, self.meta_annotations):
             temp_tuple = (annotation[0], list(self.channels.keys()))
@@ -393,7 +404,7 @@ class Window(QtWidgets.QWidget):
                 annotation_array[:, :, i] = img[annotation[2]:annotation[4], annotation[1]:annotation[3]]
                 meta_annotation_array[:, :, i] = img[meta_annotation[1]:meta_annotation[3],
                                                      meta_annotation[0]:meta_annotation[2]]
-                temp_tuple += (annotation_array, meta_annotation_array)
+            temp_tuple += (annotation_array, meta_annotation_array)
             save_list.append(temp_tuple)
         pickle.dump(save_list, open(fileName, 'wb'))
         print('done')
@@ -466,6 +477,8 @@ class Window(QtWidgets.QWidget):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = Window()
-    window.setGeometry(500, 300, 800, 600)
+
+
+    # window.setGeometry(500, 300, 800, 600)
     window.show()
     sys.exit(app.exec_())
