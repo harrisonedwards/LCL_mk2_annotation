@@ -433,11 +433,11 @@ class Window(QtWidgets.QWidget):
             tempGroupBoxVLayout = QtWidgets.QVBoxLayout()
             tempGroupBox.setLayout(tempGroupBoxVLayout)
             # make radio button hbox
-            tempRadioButtonHlayout = QtWidgets.QHBoxLayout()
-            tempPositiveRadioButton = QtWidgets.QRadioButton('+ Marker')
-            tempNegativeRadioButton = QtWidgets.QRadioButton('- Marker')
-            tempRadioButtonHlayout.addWidget(tempPositiveRadioButton)
-            tempRadioButtonHlayout.addWidget(tempNegativeRadioButton)
+            # tempRadioButtonHlayout = QtWidgets.QHBoxLayout()
+            # tempPositiveRadioButton = QtWidgets.QRadioButton('+ Marker')
+            # tempNegativeRadioButton = QtWidgets.QRadioButton('- Marker')
+            # tempRadioButtonHlayout.addWidget(tempPositiveRadioButton)
+            # tempRadioButtonHlayout.addWidget(tempNegativeRadioButton)
             # make slider widget
             tempSliderWidget = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
             tempSliderWidget.setObjectName(k)
@@ -446,10 +446,10 @@ class Window(QtWidgets.QWidget):
             # tempSliderWidget.valueChanged.connect(self.getSliderValues)
             tempSliderWidget.setSliderPosition(int(channelThreshValues[k]))
             # add radio hbox to overall vGroupBox
-            tempGroupBoxVLayout.addLayout(tempRadioButtonHlayout)
+            # tempGroupBoxVLayout.addLayout(tempRadioButtonHlayout)
             # add slider widget to overall vGroupBox
             tempGroupBoxVLayout.addWidget(tempSliderWidget)
-            self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
+            # self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
             self.HBlayout.addWidget(tempGroupBox)
             self.channelSliders[k] = tempSliderWidget
         if self.locatedObjectsComboBox is not None:
