@@ -207,7 +207,7 @@ class Window(QtWidgets.QWidget):
         # add the list of auto located dapi things
         self.locatedObjectsComboBox.setEnabled(True)
         # go to the first index of the auto located things
-
+        text = self.locatedObjectsComboBox.currentText()
         self.snapToDapiLoc(text)
         # set it so we can only zoom directly in and out
         self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
@@ -221,6 +221,7 @@ class Window(QtWidgets.QWidget):
             self.startAssistedAnnotation()
         elif not self.annotationAssistPushButton.isChecked():
             self.stopAssistedAnnotation()
+            self.annotateNoneRadioButton.click()
 
     def getSliderValues(self, _):
         channelThreshValues = {}
@@ -288,10 +289,6 @@ class Window(QtWidgets.QWidget):
         else:
             QMessageBox.about(self, "Error", "No DAPI channel detected for auto-finding")
             return
-        for obj in self.obj_channels[dapiChan]:
-            x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
-            y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
-            self.locatedObjectsComboBox.addItem(f'{x}, {y}')
         # draw all of our boxes
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255), QtGui.QColor(102, 51, 0)]
         temp_items = {}
@@ -307,6 +304,11 @@ class Window(QtWidgets.QWidget):
                                                             , obj[0].stop - obj[0].start), color)
                     temp_items[k].append(obj)
         self.obj_channels = temp_items
+        for i in range(4, len(self.obj_channels[dapiChan]), 4):
+            obj = self.obj_channels[dapiChan][i]
+            x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
+            y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
+            self.locatedObjectsComboBox.addItem(f'{x}, {y}')
         self.annotateNoneRadioButton.click()
 
     def snapToDapiLoc(self, text):
@@ -352,6 +354,7 @@ class Window(QtWidgets.QWidget):
         self.annotateNoneRadioButton.setChecked(True)
         self.startAnnotating()
         self.annotateNoneRadioButton.click()
+        self.obj_channels = None
 
     def photoClicked(self, pos):
         if self.viewer.dragMode() == QtWidgets.QGraphicsView.NoDrag:
@@ -362,6 +365,10 @@ class Window(QtWidgets.QWidget):
             if self.obj_channels is None:
                 QMessageBox.about(self, "Error", "Please use the auto find feature before annotating")
                 return
+            if self.trackingAnnotations == False:
+                QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
+                                                   "annotation assist.")
+                return
             min_x = min(pos.x(), self.rect_start[0])
             min_y = min(pos.y(), self.rect_start[1])
             max_x = max(pos.x(), self.rect_start[0])
@@ -369,6 +376,16 @@ class Window(QtWidgets.QWidget):
 
             self.viewer.scene.addRect(QtCore.QRectF(min_x, min_y, max_x - min_x, max_y - min_y),
                                       self.annotation_pen)
+            msgBox = QMessageBox()
+
+            msgBox.setInformativeText("Accept Annotation And Move on?")
+            msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            ret = msgBox.exec_()
+            if ret == QMessageBox.No:
+                rect = self.viewer.scene.itemAt(pos, QtGui.QTransform())
+                self.viewer.scene.removeItem(rect)
+                return
+
             self.annotations.append((self.annotationType, min_x, min_y, max_x, max_y))
 
             if 'DAPI' in self.obj_channels.keys():
@@ -380,15 +397,14 @@ class Window(QtWidgets.QWidget):
             zoom = self.viewer.zoom
             idx = self.locatedObjectsComboBox.currentIndex()
             obj = self.obj_channels[dapiChan][idx]
+
+            self.locatedObjectsComboBox.removeItem(idx)
             self.meta_annotations.append((zoom, [int(i) for i in [ul.x(), ul.y(), br.x(), br.y()]],
                                               [(obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)]))
-            # else:
-            #     QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
-            #                                        "annotation assist.")
-            if self.deletingAnnotations:
-                self.deleteAnnotation(pos)
-            print('annotations:', self.annotations)
-            print('meta annotations:', self.meta_annotations)
+        elif self.deletingAnnotations:
+            self.deleteAnnotation(pos)
+        print('annotations:', self.annotations)
+        print('meta annotations:', self.meta_annotations)
 
     def changeChannel(self, channel):
         if channel == '':
