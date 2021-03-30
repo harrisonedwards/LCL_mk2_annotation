@@ -433,6 +433,8 @@ class Window(QtWidgets.QWidget):
             tempGroupBoxVLayout = QtWidgets.QVBoxLayout()
             tempGroupBox.setLayout(tempGroupBoxVLayout)
             # make radio button hbox
+            # TODO make this robust to being activated multiple times without re-adding the elements
+            #  (for some reason it was fine with the markers)
             # tempRadioButtonHlayout = QtWidgets.QHBoxLayout()
             # tempPositiveRadioButton = QtWidgets.QRadioButton('+ Marker')
             # tempNegativeRadioButton = QtWidgets.QRadioButton('- Marker')
@@ -456,7 +458,14 @@ class Window(QtWidgets.QWidget):
             self.HBlayout.removeWidget(self.locatedObjectsComboBox)
         # setup extra gui elements
         # TODO: remove all items first before repopulating
-        for obj in self.obj_channels['dapi']:
+        if 'DAPI' in self.obj_channels.keys():
+            chan = 'DAPI'
+        elif 'dapi' in self.obj_channels.keys():
+            chan = 'dapi'
+        else:
+            QMessageBox.about(self, "Error", "No DAPI channel detected for auto-finding")
+            return
+        for obj in self.obj_channels[chan]:
             x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
             y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
             self.locatedObjectsComboBox.addItem(f'{x}, {y}')
