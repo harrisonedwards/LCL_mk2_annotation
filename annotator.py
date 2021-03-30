@@ -230,15 +230,7 @@ class Window(QtWidgets.QWidget):
         return channelThreshValues
 
     def addChannelSelections(self, channelThreshValues):
-
         colors = [' (RED)', ' (GREEN)', ' (BLUE)', ' (BROWN)']
-
-        # check if the groupbox names are the same
-
-        # if they are the same, get the slider values, and do not add new groupboxes
-
-        # # delete all old group boxes if they exist:
-
         for i, (k, _) in enumerate(self.obj_channels.items()):
             # make overall vGroupBox
             tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
@@ -255,7 +247,6 @@ class Window(QtWidgets.QWidget):
             tempSliderWidget.setMaximum(255)
             tempSliderWidget.setMinimum(0)
             tempSliderWidget.setSliderPosition(int(channelThreshValues[k]))
-            # tempSliderWidget.valueChanged.connect(self.getSliderValues)
 
             # add slider widget to overall vGroupBox
             tempGroupBoxVLayout.addWidget(tempSliderWidget)
@@ -272,18 +263,6 @@ class Window(QtWidgets.QWidget):
     #     # create the dapi auto-ping combobox
     #     # first check for a DAPI channel
 
-
-    def removeChannelGroupBoxes(self):
-        if len(self.channelGroupBoxes) > 0:
-            for name, _ in self.obj_channels.items():
-                groupBox = self.findChild(QtWidgets.QGroupBox, name + 'GroupBox')
-                self.HBlayout.removeWidget(groupBox)
-                sip.delete(groupBox)
-                groupBox = None
-                self.channelGroupBoxes = []
-            self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
-            self.HBlayout.removeWidget(self.annotationAssistPushButton)
-            self.HBlayout.removeWidget(self.locatedObjectsComboBox)
 
     def autoLocate(self):
         self.removeAllRects()
@@ -328,6 +307,7 @@ class Window(QtWidgets.QWidget):
                                                             , obj[0].stop - obj[0].start), color)
                     temp_items[k].append(obj)
         self.obj_channels = temp_items
+        self.annotateNoneRadioButton.click()
 
     def snapToDapiLoc(self, text):
         if self.annotationAssistPushButton.isChecked():
@@ -371,34 +351,40 @@ class Window(QtWidgets.QWidget):
         self.viewer.zoom = 0
         self.annotateNoneRadioButton.setChecked(True)
         self.startAnnotating()
+        self.annotateNoneRadioButton.click()
 
     def photoClicked(self, pos):
         if self.viewer.dragMode() == QtWidgets.QGraphicsView.NoDrag:
             self.rect_start = [pos.x(), pos.y()]
 
     def photoReleased(self, pos):
-        if self.viewer.dragMode() == QtWidgets.QGraphicsView.NoDrag:
-            if self.annotationType in ['Positive', 'Negative']:
-                min_x = min(pos.x(), self.rect_start[0])
-                min_y = min(pos.y(), self.rect_start[1])
-                max_x = max(pos.x(), self.rect_start[0])
-                max_y = max(pos.y(), self.rect_start[1])
+        if self.annotationType in ['Positive', 'Negative']:
+            if self.obj_channels is None:
+                QMessageBox.about(self, "Error", "Please use the auto find feature before annotating")
+                return
+            min_x = min(pos.x(), self.rect_start[0])
+            min_y = min(pos.y(), self.rect_start[1])
+            max_x = max(pos.x(), self.rect_start[0])
+            max_y = max(pos.y(), self.rect_start[1])
 
-                self.viewer.scene.addRect(QtCore.QRectF(min_x, min_y, max_x - min_x, max_y - min_y),
-                                          self.annotation_pen)
-                self.annotations.append((self.annotationType, min_x, min_y, max_x, max_y))
+            self.viewer.scene.addRect(QtCore.QRectF(min_x, min_y, max_x - min_x, max_y - min_y),
+                                      self.annotation_pen)
+            self.annotations.append((self.annotationType, min_x, min_y, max_x, max_y))
 
-                if self.trackingAnnotations:
-                    ul = self.viewer.mapToScene(self.rect().topLeft())
-                    br = self.viewer.mapToScene(self.rect().bottomRight())
-                    zoom = self.viewer.zoom
-                    idx = self.locatedObjectsComboBox.currentIndex()
-                    obj = self.obj_channels['dapi'][idx]
-                    self.meta_annotations.append((zoom, [int(i) for i in [ul.x(), ul.y(), br.x(), br.y()]],
-                                                  [(obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)]))
-                # else:
-                #     QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
-                #                                        "annotation assist.")
+            if 'DAPI' in self.obj_channels.keys():
+                dapiChan = 'DAPI'
+            elif 'dapi' in self.obj_channels.keys():
+                dapiChan = 'dapi'
+            ul = self.viewer.mapToScene(self.rect().topLeft())
+            br = self.viewer.mapToScene(self.rect().bottomRight())
+            zoom = self.viewer.zoom
+            idx = self.locatedObjectsComboBox.currentIndex()
+            obj = self.obj_channels[dapiChan][idx]
+            self.meta_annotations.append((zoom, [int(i) for i in [ul.x(), ul.y(), br.x(), br.y()]],
+                                              [(obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)]))
+            # else:
+            #     QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
+            #                                        "annotation assist.")
             if self.deletingAnnotations:
                 self.deleteAnnotation(pos)
             print('annotations:', self.annotations)
@@ -446,6 +432,18 @@ class Window(QtWidgets.QWidget):
         for item in self.viewer.scene.items():
             if item.type() == 3:
                 self.viewer.scene.removeItem(item)
+
+    def removeChannelGroupBoxes(self):
+        if len(self.channelGroupBoxes) > 0:
+            for name, _ in self.obj_channels.items():
+                groupBox = self.findChild(QtWidgets.QGroupBox, name + 'GroupBox')
+                self.HBlayout.removeWidget(groupBox)
+                sip.delete(groupBox)
+                groupBox = None
+                self.channelGroupBoxes = []
+            self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
+            self.HBlayout.removeWidget(self.annotationAssistPushButton)
+            self.HBlayout.removeWidget(self.locatedObjectsComboBox)
 
     def deleteAnnotation(self, pos):
         rect = self.viewer.scene.itemAt(pos, QtGui.QTransform())
