@@ -107,7 +107,7 @@ class Window(QtWidgets.QWidget):
     def __init__(self):
         super(Window, self).__init__()
         self.showMaximized()
-        
+
         self.directory = None
 
         self.viewer = PhotoViewer(self)
@@ -166,7 +166,6 @@ class Window(QtWidgets.QWidget):
         self.HBlayout.addWidget(self.channelLabel)
         self.HBlayout.addWidget(self.channelComboBoxWidget)
 
-
         # self.HBlayout.addWidget(self.loadAnnotationPushButton)
 
         self.VBlayout.addLayout(self.HBlayout)
@@ -177,7 +176,7 @@ class Window(QtWidgets.QWidget):
         self.annotationType = 'None'
         self.annotations = []
         self.meta_annotations = []
-        self.channelGroupBoxes = {}
+        self.channelGroupBoxes = []
         self.channelSliders = {}
         self.obj_channels = None
         self.locatedObjectsComboBox = QtWidgets.QComboBox()
@@ -209,7 +208,6 @@ class Window(QtWidgets.QWidget):
         self.locatedObjectsComboBox.setEnabled(True)
         # go to the first index of the auto located things
 
-
         self.snapToDapiLoc(text)
         # set it so we can only zoom directly in and out
         self.viewer.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorViewCenter)
@@ -224,20 +222,98 @@ class Window(QtWidgets.QWidget):
         elif not self.annotationAssistPushButton.isChecked():
             self.stopAssistedAnnotation()
 
+    def getSliderValues(self, _):
+        channelThreshValues = {}
+        for name, _ in self.obj_channels.items():
+            slider = self.findChild(QtWidgets.QSlider, name)
+            channelThreshValues[name] = slider.value()
+        return channelThreshValues
 
+    def addChannelSelections(self, channelThreshValues):
+
+        colors = [' (RED)', ' (GREEN)', ' (BLUE)', ' (BROWN)']
+
+        # check if the groupbox names are the same
+
+        # if they are the same, get the slider values, and do not add new groupboxes
+
+        # # delete all old group boxes if they exist:
+
+        for i, (k, _) in enumerate(self.obj_channels.items()):
+            # make overall vGroupBox
+            tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
+
+            tempGroupBox.setObjectName(k + 'GroupBox')
+            tempGroupBoxVLayout = QtWidgets.QVBoxLayout()
+            tempGroupBox.setLayout(tempGroupBoxVLayout)
+
+            # TODO make this robust to being activated multiple times without re-adding the elements
+
+            # make slider widget
+            tempSliderWidget = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
+            tempSliderWidget.setObjectName(k)
+            tempSliderWidget.setMaximum(255)
+            tempSliderWidget.setMinimum(0)
+            tempSliderWidget.setSliderPosition(int(channelThreshValues[k]))
+            # tempSliderWidget.valueChanged.connect(self.getSliderValues)
+
+            # add slider widget to overall vGroupBox
+            tempGroupBoxVLayout.addWidget(tempSliderWidget)
+            self.HBlayout.addWidget(tempGroupBox)
+            self.channelGroupBoxes.append(tempGroupBox)
+            self.channelSliders[k] = tempSliderWidget
+
+
+            if self.locatedObjectsComboBox is not None:
+                self.HBlayout.removeWidget(self.locatedObjectsComboBox)
+
+
+    # def setupLocatedObjectsCombobox(self):
+    #     # create the dapi auto-ping combobox
+    #     # first check for a DAPI channel
+
+
+    def removeChannelGroupBoxes(self):
+        if len(self.channelGroupBoxes) > 0:
+            for name, _ in self.obj_channels.items():
+                groupBox = self.findChild(QtWidgets.QGroupBox, name + 'GroupBox')
+                self.HBlayout.removeWidget(groupBox)
+                sip.delete(groupBox)
+                groupBox = None
+                self.channelGroupBoxes = []
+            self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
+            self.HBlayout.removeWidget(self.annotationAssistPushButton)
+            self.HBlayout.removeWidget(self.locatedObjectsComboBox)
 
     def autoLocate(self):
         self.removeAllRects()
         self.stopAssistedAnnotation()
         self.locatedObjectsComboBox.clear()
-        if self.channelGroupBoxes != {}:
+
+        if len(self.channelGroupBoxes) != 0:
             # if we do have channel group boxes
             channelThreshValues = self.getSliderValues(None)
-            self.removeChannelGroupBoxes()
             self.obj_channels, channelThreshValues = get_obj_channels(self.directory, channelThreshValues)
-        elif self.channelGroupBoxes == {}:
+        elif len(self.channelGroupBoxes) == 0:
             # if we dont have channel group boxes
             self.obj_channels, channelThreshValues = get_obj_channels(self.directory)
+            self.addChannelSelections(channelThreshValues)
+            # add auto-annotation gui elements
+            self.HBlayout.addWidget(self.annotationAssistPushButton)
+            self.HBlayout.addWidget(self.locatedObjectsComboBox)
+            self.locatedObjectsComboBox.setEnabled(False)
+        if 'DAPI' in self.obj_channels.keys():
+            dapiChan = 'DAPI'
+        elif 'dapi' in self.obj_channels.keys():
+            dapiChan = 'dapi'
+        else:
+            QMessageBox.about(self, "Error", "No DAPI channel detected for auto-finding")
+            return
+        for obj in self.obj_channels[dapiChan]:
+            x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
+            y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
+            self.locatedObjectsComboBox.addItem(f'{x}, {y}')
+        # draw all of our boxes
         colors = [QtGui.QColor(255, 0, 0), QtGui.QColor(0, 255, 0), QtGui.QColor(0, 0, 255), QtGui.QColor(102, 51, 0)]
         temp_items = {}
         for i, [k, v] in enumerate(self.obj_channels.items()):
@@ -252,10 +328,6 @@ class Window(QtWidgets.QWidget):
                                                             , obj[0].stop - obj[0].start), color)
                     temp_items[k].append(obj)
         self.obj_channels = temp_items
-        self.addChannelSelections(channelThreshValues)
-        self.HBlayout.addWidget(self.annotationAssistPushButton)
-        self.HBlayout.addWidget(self.locatedObjectsComboBox)
-        self.locatedObjectsComboBox.setEnabled(False)
 
     def snapToDapiLoc(self, text):
         if self.annotationAssistPushButton.isChecked():
@@ -273,7 +345,10 @@ class Window(QtWidgets.QWidget):
         # reset the gui for new image
         self.removeAllRects()
         self.channelComboBoxWidget.clear()
-        if self.channelGroupBoxes != {}:
+        self.stopAssistedAnnotation()
+        if self.locatedObjectsComboBox is not None:
+            self.locatedObjectsComboBox.clear()
+        if len(self.channelGroupBoxes) != 0:
             self.removeChannelGroupBoxes()
         # now setup gui with new image
         ret = str(QFileDialog.getExistingDirectory(self, "Select directory containing images for annotation"))
@@ -321,9 +396,9 @@ class Window(QtWidgets.QWidget):
                     obj = self.obj_channels['dapi'][idx]
                     self.meta_annotations.append((zoom, [int(i) for i in [ul.x(), ul.y(), br.x(), br.y()]],
                                                   [(obj[1].stop - obj[1].start) * (obj[0].stop - obj[0].start)]))
-                else:
-                    QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
-                                                       "annotation assist.")
+                # else:
+                #     QMessageBox.about(self, "Warning", "Meta annotations are currently not being saved! Please enable "
+                #                                        "annotation assist.")
             if self.deletingAnnotations:
                 self.deleteAnnotation(pos)
             print('annotations:', self.annotations)
@@ -411,73 +486,11 @@ class Window(QtWidgets.QWidget):
                 img = np.array(Image.open(self.channels[channel]))
                 annotation_array[:, :, i] = img[annotation[2]:annotation[4], annotation[1]:annotation[3]]
                 meta_annotation_array[:, :, i] = img[meta_annotation[1]:meta_annotation[3],
-                                                     meta_annotation[0]:meta_annotation[2]]
+                                                 meta_annotation[0]:meta_annotation[2]]
             temp_tuple += (annotation_array, meta_annotation_array)
             save_list.append(temp_tuple)
         pickle.dump(save_list, open(fileName, 'wb'))
         print('done')
-
-    def getSliderValues(self, _):
-        channelThreshValues = {}
-        for name, _ in self.obj_channels.items():
-            slider = self.findChild(QtWidgets.QSlider, name)
-            channelThreshValues[name] = slider.value()
-        return channelThreshValues
-
-    def addChannelSelections(self, channelThreshValues):
-        colors = [' (RED)', ' (GREEN)', ' (BLUE)', ' (BROWN)']
-        for i, (k, _) in enumerate(self.obj_channels.items()):
-            # make overall vGroupBox
-            tempGroupBox = QtWidgets.QGroupBox(k + colors[i])
-            tempGroupBox.setObjectName(k + 'GroupBox')
-            tempGroupBoxVLayout = QtWidgets.QVBoxLayout()
-            tempGroupBox.setLayout(tempGroupBoxVLayout)
-            # make radio button hbox
-            # TODO make this robust to being activated multiple times without re-adding the elements
-            #  (for some reason it was fine with the markers)
-            # tempRadioButtonHlayout = QtWidgets.QHBoxLayout()
-            # tempPositiveRadioButton = QtWidgets.QRadioButton('+ Marker')
-            # tempNegativeRadioButton = QtWidgets.QRadioButton('- Marker')
-            # tempRadioButtonHlayout.addWidget(tempPositiveRadioButton)
-            # tempRadioButtonHlayout.addWidget(tempNegativeRadioButton)
-            # make slider widget
-            tempSliderWidget = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
-            tempSliderWidget.setObjectName(k)
-            tempSliderWidget.setMaximum(255)
-            tempSliderWidget.setMinimum(0)
-            # tempSliderWidget.valueChanged.connect(self.getSliderValues)
-            tempSliderWidget.setSliderPosition(int(channelThreshValues[k]))
-            # add radio hbox to overall vGroupBox
-            # tempGroupBoxVLayout.addLayout(tempRadioButtonHlayout)
-            # add slider widget to overall vGroupBox
-            tempGroupBoxVLayout.addWidget(tempSliderWidget)
-            # self.channelGroupBoxes[k] = [tempPositiveRadioButton, tempNegativeRadioButton]
-            self.HBlayout.addWidget(tempGroupBox)
-            self.channelSliders[k] = tempSliderWidget
-        if self.locatedObjectsComboBox is not None:
-            self.HBlayout.removeWidget(self.locatedObjectsComboBox)
-        # setup extra gui elements
-        # TODO: remove all items first before repopulating
-        if 'DAPI' in self.obj_channels.keys():
-            chan = 'DAPI'
-        elif 'dapi' in self.obj_channels.keys():
-            chan = 'dapi'
-        else:
-            QMessageBox.about(self, "Error", "No DAPI channel detected for auto-finding")
-            return
-        for obj in self.obj_channels[chan]:
-            x = int(obj[1].start + (obj[1].stop - obj[1].start) / 2)
-            y = int(obj[0].start + (obj[0].stop - obj[0].start) / 2)
-            self.locatedObjectsComboBox.addItem(f'{x}, {y}')
-
-    def removeChannelGroupBoxes(self):
-        for name, _ in self.obj_channels.items():
-            groupBox = self.findChild(QtWidgets.QGroupBox, name + 'GroupBox')
-            self.HBlayout.removeWidget(groupBox)
-            sip.delete(groupBox)
-            groupBox = None
-            self.channelGroupBoxes = {}
-        self.HBlayout.removeWidget(self.autoAnnotatePushbutton)
 
     def loadAnnotations(self):
         print('loading annotations...')
@@ -494,7 +507,6 @@ class Window(QtWidgets.QWidget):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = Window()
-
 
     # window.setGeometry(500, 300, 800, 600)
     window.show()
